@@ -5,7 +5,7 @@ extern crate glob;
 extern crate pulldown_cmark as cmark;
 extern crate tempfile;
 
-use cmark::{Event, Parser, Tag};
+use cmark::{CodeBlockKind, Event, Parser, Tag};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -199,7 +199,7 @@ fn extract_tests_from_file(path: &Path) -> Result<DocTest, IoError> {
 fn extract_tests_from_string(s: &str, file_stem: &str) -> (Vec<Test>, Option<String>) {
     let mut tests = Vec::new();
     let mut buffer = Buffer::None;
-    let mut parser = Parser::new(s);
+    let parser = Parser::new(s);
     let mut section = None;
     let mut code_block_start = 0;
     // Oh this isn't actually a test but a legacy template
@@ -217,7 +217,7 @@ fn extract_tests_from_string(s: &str, file_stem: &str) -> (Vec<Test>, Option<Str
                     section = Some(sanitize_test_name(&sect));
                 }
             }
-            Event::Start(Tag::CodeBlock(ref info)) => {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref info))) => {
                 let code_block_info = parse_code_block_info(info);
                 if code_block_info.is_rust {
                     buffer = Buffer::Code(Vec::new());
@@ -233,7 +233,7 @@ fn extract_tests_from_string(s: &str, file_stem: &str) -> (Vec<Test>, Option<Str
                     buf.push_str(&*text);
                 }
             }
-            Event::End(Tag::CodeBlock(ref info)) => {
+            Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(ref info))) => {
                 let code_block_info = parse_code_block_info(info);
                 if let Buffer::Code(buf) = mem::replace(&mut buffer, Buffer::None) {
                     if code_block_info.is_old_template {
@@ -282,7 +282,7 @@ fn load_templates(path: &Path) -> Result<HashMap<String, String>, IoError> {
 
     for event in parser {
         match event {
-            Event::Start(Tag::CodeBlock(ref info)) => {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref info))) => {
                 let code_block_info = parse_code_block_info(info);
                 if code_block_info.is_rust {
                     code_buffer = Some(Vec::new());
@@ -293,7 +293,7 @@ fn load_templates(path: &Path) -> Result<HashMap<String, String>, IoError> {
                     buf.push(text.to_string());
                 }
             }
-            Event::End(Tag::CodeBlock(ref info)) => {
+            Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(ref info))) => {
                 let code_block_info = parse_code_block_info(info);
                 if let Some(buf) = code_buffer.take() {
                     if let Some(t) = code_block_info.template {
